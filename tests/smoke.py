@@ -25,6 +25,8 @@ def main() -> None:
     # Refuse to run against real settings or links, because this ends by uninstalling.
     assert os.environ.get("JARVIS_BIN_DIR"), "set JARVIS_BIN_DIR to a throwaway folder"
     assert config_dir != Path.home() / ".claude", "set CLAUDE_CONFIG_DIR to a throwaway folder"
+    # An old log would satisfy the checks below without this run having done anything.
+    (home / "jarvis.log").unlink(missing_ok=True)
     print(jarvis("install"))
     assert "already present" in jarvis("install"), "second install should change nothing"
     assert "installed" in jarvis("status")
