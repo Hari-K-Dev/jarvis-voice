@@ -97,7 +97,7 @@ def trim_input(raw: str) -> str:
 
 def summarise(raw: str, run: Callable = subprocess.run) -> str:
     """Ask Haiku for the spoken version. Raises on any failure."""
-    config.HOME.mkdir(parents=True, exist_ok=True)
+    config.ensure_home()
     result = run(
         [
             "claude",
@@ -124,7 +124,8 @@ def summarise(raw: str, run: Callable = subprocess.run) -> str:
         env={**os.environ, "JARVIS_SUMMARY": "1"},
     )
     if result.returncode != 0:
-        raise RuntimeError(f"claude exited {result.returncode}")
+        log(f"claude exited {result.returncode}")
+        raise RuntimeError("summary call failed")
     spoken = cap(clean(result.stdout))
     if not spoken:
         raise RuntimeError("empty summary")
@@ -137,5 +138,5 @@ def make_brief(raw: str, run: Callable = subprocess.run) -> str:
     try:
         return summarise(raw, run)
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
-        log(f"summary failed, using fallback: {type(exc).__name__}: {exc}")
+        log(f"summary failed, using fallback: {type(exc).__name__}")
         return fallback(raw)

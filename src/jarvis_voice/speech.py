@@ -20,7 +20,7 @@ MULTI_SESSION_WINDOW = 1800
 @contextmanager
 def speech_lock() -> Iterator[None]:
     """Blocks until any other session has finished talking."""
-    config.HOME.mkdir(parents=True, exist_ok=True)
+    config.ensure_home()
     with config.LOCK.open("w") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
         yield
@@ -49,7 +49,7 @@ def with_project_prefix(brief: str, cwd: str, now: float | None = None) -> str:
     try:
         config.RECENT.write_text(json.dumps(recent))
     except OSError as exc:
-        log(f"could not save recent projects: {exc}")
+        log(f"could not save recent projects: {type(exc).__name__}")
     return f"{project}: {brief}" if project and others else brief
 
 
@@ -94,7 +94,10 @@ def speak(text: str) -> None:
             synthesise(text, wav)
             log(f"synthesised {len(text)} chars in {time.time() - started:.2f}s")
         except Exception as exc:  # noqa: BLE001 - any engine failure must still produce speech
-            log(f"kokoro failed, using say: {type(exc).__name__}: {exc}")
-            subprocess.run(["say", "-v", "Daniel", text], check=False, timeout=60)
+            log(f"kokoro failed, using say: {type(exc).__name__}")
+            try:
+                subprocess.run(["say", "-v", "Daniel", text], check=False, timeout=60)
+            except (OSError, subprocess.SubprocessError) as say_exc:
+                log(f"say failed: {type(say_exc).__name__}")
             return
         play(wav)

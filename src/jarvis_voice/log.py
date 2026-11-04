@@ -1,5 +1,10 @@
-"""Metadata-only log. Reply text is never written, because it can hold client work."""
+"""Metadata-only log. Reply text is never written, because it can hold client work.
 
+Log exception types, not messages: a message can quote the text being spoken, as
+subprocess.TimeoutExpired does with its command line.
+"""
+
+import os
 import time
 
 from . import config
@@ -9,10 +14,12 @@ MAX_BYTES = 1_000_000
 
 def log(line: str) -> None:
     try:
-        config.HOME.mkdir(parents=True, exist_ok=True)
+        config.ensure_home()
         if config.LOG.exists() and config.LOG.stat().st_size > MAX_BYTES:
             config.LOG.unlink()
-        with config.LOG.open("a") as f:
+        fd = os.open(config.LOG, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "a") as f:
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {line}\n")
     except OSError:
         pass

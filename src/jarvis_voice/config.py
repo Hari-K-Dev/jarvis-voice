@@ -23,6 +23,12 @@ MODEL_FILES = {
 }
 
 
+def ensure_home() -> None:
+    """State can reveal project names and timings, so only the owner may read it."""
+    HOME.mkdir(parents=True, exist_ok=True, mode=0o700)
+    HOME.chmod(0o700)
+
+
 def model_path(name: str) -> Path:
     return MODELS / name
 

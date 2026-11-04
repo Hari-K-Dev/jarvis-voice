@@ -1,4 +1,8 @@
+import stat
+import subprocess
+
 from jarvis_voice import config, speech
+from jarvis_voice.log import log
 
 
 def test_single_project_has_no_prefix(tmp_path):
@@ -50,3 +54,26 @@ def test_kokoro_failure_falls_back_to_say(monkeypatch):
 
 def test_stop_playback_with_nothing_playing():
     assert speech.stop_playback() is False
+
+
+def test_say_timeout_leaves_no_brief_text_in_the_log(monkeypatch):
+    """Regression: TimeoutExpired's message quotes the command, which holds the brief."""
+
+    def broken(*a):
+        raise RuntimeError("SECRET-BRIEF")
+
+    def slow_say(cmd, **k):
+        raise subprocess.TimeoutExpired(cmd, 60)
+
+    monkeypatch.setattr(speech, "synthesise", broken)
+    monkeypatch.setattr(speech.subprocess, "run", slow_say)
+    speech.speak("SECRET-BRIEF")
+    text = config.LOG.read_text()
+    assert "say failed: TimeoutExpired" in text and "SECRET" not in text
+
+
+def test_state_is_private_to_the_owner(tmp_path):
+    config.HOME.chmod(0o755)
+    log("hello")
+    assert stat.S_IMODE(config.HOME.stat().st_mode) == 0o700
+    assert stat.S_IMODE(config.LOG.stat().st_mode) == 0o600

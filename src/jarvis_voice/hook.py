@@ -24,6 +24,11 @@ def skip_reason(payload: dict, env: dict, muted: bool) -> str | None:
     return None
 
 
+def worker_command() -> list[str]:
+    """Isolated mode (-I), so nothing in the session's project can replace the worker's code."""
+    return [sys.executable, "-I", "-m", "jarvis_voice.worker"]
+
+
 def main() -> None:
     try:
         payload = json.load(sys.stdin)
@@ -31,8 +36,10 @@ def main() -> None:
         if reason:
             log(f"skipped: {reason}")
             return
+        config.ensure_home()
         worker = subprocess.Popen(
-            [sys.executable, "-m", "jarvis_voice.worker"],
+            worker_command(),
+            cwd=config.HOME,
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -42,7 +49,7 @@ def main() -> None:
         worker.stdin.write(json.dumps(payload))
         worker.stdin.close()
     except Exception as exc:  # noqa: BLE001 - a voice problem must never surface in the session
-        log(f"hook failed: {type(exc).__name__}: {exc}")
+        log(f"hook failed: {type(exc).__name__}")
     finally:
         sys.exit(0)
 
