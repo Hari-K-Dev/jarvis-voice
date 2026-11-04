@@ -41,15 +41,15 @@ def test_last_request_with_a_missing_file_is_empty(tmp_path):
 
 
 def test_spoken_project_uses_repo_root_and_tidies_the_folder_name(tmp_path):
-    (tmp_path / "prismo-ai_shop" / ".git").mkdir(parents=True)
-    (tmp_path / "prismo-ai_shop" / "src").mkdir()
-    assert label.spoken_project(str(tmp_path / "prismo-ai_shop" / "src")) == "prismo ai shop"
+    (tmp_path / "acme-ai_shop" / ".git").mkdir(parents=True)
+    (tmp_path / "acme-ai_shop" / "src").mkdir()
+    assert label.spoken_project(str(tmp_path / "acme-ai_shop" / "src")) == "acme ai shop"
 
 
 def test_chosen_spoken_name_wins(tmp_path):
-    (tmp_path / "prismo-ai").mkdir()
-    label.set_spoken_name("prismo-ai", "Psynapse")
-    assert label.spoken_project(str(tmp_path / "prismo-ai")) == "Psynapse"
+    (tmp_path / "acme-ai").mkdir()
+    label.set_spoken_name("acme-ai", "Acme")
+    assert label.spoken_project(str(tmp_path / "acme-ai")) == "Acme"
 
 
 def test_corrupt_names_file_falls_back_to_the_folder(tmp_path):
@@ -75,8 +75,8 @@ def test_session_id_cannot_escape_the_tasks_folder():
 
 
 def test_announcement_handles_missing_parts():
-    assert label.announcement("Psynapse", "login fix") == "Psynapse, login fix."
-    assert label.announcement("Psynapse", "") == "Psynapse."
+    assert label.announcement("Acme", "login fix") == "Acme, login fix."
+    assert label.announcement("Acme", "") == "Acme."
     assert label.announcement("", "") == ""
 
 

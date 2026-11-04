@@ -3,10 +3,11 @@
 import os
 import re
 import subprocess
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import config
+from . import config, system
 from .log import log
 
 MAX_SPOKEN = 320
@@ -52,6 +53,7 @@ _TASK_LINE = re.compile(r"^\s*TASK:\s*(.+)$", re.MULTILINE)
 _BRIEF_LINE = re.compile(r"^\s*BRIEF:\s*(.+)", re.MULTILINE | re.DOTALL)
 
 _PATH = re.compile(r"(?<![\w/])(?:~|\.{1,2})?/[\w.@-]+(?:/[\w.@-]+)*(?::\d+)?")
+_WINDOWS_PATH = re.compile(r"\b[A-Za-z]:[\\/]\S*")
 _URL = re.compile(r"https?://\S+")
 
 
@@ -62,6 +64,7 @@ def clean(text: str) -> str:
     text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
     text = _URL.sub("", text)
     text = text.replace("`", "")
+    text = _WINDOWS_PATH.sub("", text)
     text = _PATH.sub("", text)
     text = re.sub(r"^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)", "", text, flags=re.MULTILINE)
     text = re.sub(r"\*\*|__|(?<!\w)\*|\*(?!\w)", "", text)
@@ -94,7 +97,7 @@ def needs_summary(raw: str) -> bool:
         len(raw) > DIRECT_LIMIT
         or raw.strip().count("\n") > 0
         or "```" in raw
-        or bool(_URL.search(raw) or _PATH.search(raw))
+        or bool(_URL.search(raw) or _PATH.search(raw) or _WINDOWS_PATH.search(raw))
     )
 
 
@@ -133,35 +136,45 @@ def summarise(
 ) -> Brief:
     """Ask Haiku for the task name and spoken version. Raises on any failure."""
     config.ensure_home()
-    result = run(
-        [
-            "claude",
-            "-p",
-            "--model",
-            config.SUMMARY_MODEL,
-            "--no-session-persistence",
-            # Without these, startup took 70s on this machine (plugins, MCP, hooks).
-            "--setting-sources",
-            "",
-            "--strict-mcp-config",
-            "--tools",
-            "",
-            "--disable-slash-commands",
-            "--system-prompt",
-            SYSTEM_PROMPT,
-        ],
-        input=(
-            f"<current_task>{current_task}</current_task>\n"
-            f"<request>\n{request}\n</request>\n"
-            f"<reply>\n{trim_input(raw)}\n</reply>"
-        ),
-        capture_output=True,
-        text=True,
-        timeout=30,
-        cwd=config.HOME,
-        # The guard stops this nested session from speaking if its hooks ever load.
-        env={**os.environ, "JARVIS_SUMMARY": "1"},
-    )
+    # A file, because an npm .cmd shim on Windows would mangle this text as an argument.
+    fd, prompt_file = tempfile.mkstemp(dir=config.HOME, prefix=".prompt-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(SYSTEM_PROMPT)
+        result = run(
+            [
+                system.find_claude(),
+                "-p",
+                "--model",
+                config.SUMMARY_MODEL,
+                "--no-session-persistence",
+                # Without these, startup took 70s on the machine this was built on.
+                "--setting-sources",
+                "",
+                "--strict-mcp-config",
+                "--tools",
+                "",
+                "--disable-slash-commands",
+                "--system-prompt-file",
+                prompt_file,
+            ],
+            input=(
+                f"<current_task>{current_task}</current_task>\n"
+                f"<request>\n{request}\n</request>\n"
+                f"<reply>\n{trim_input(raw)}\n</reply>"
+            ),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            cwd=config.HOME,
+            # The guard stops this nested session from speaking if its hooks ever load.
+            env={**os.environ, "JARVIS_SUMMARY": "1"},
+            creationflags=system.no_window_flags(),
+        )
+    finally:
+        os.unlink(prompt_file)
     if result.returncode != 0:
         log(f"claude exited {result.returncode}")
         raise RuntimeError("summary call failed")

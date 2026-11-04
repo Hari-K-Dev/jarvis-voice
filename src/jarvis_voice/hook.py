@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 
-from . import config
+from . import config, system
 from .log import log
 
 
@@ -31,7 +31,8 @@ def worker_command() -> list[str]:
 
 def main() -> None:
     try:
-        payload = json.load(sys.stdin)
+        # Bytes, because Windows would otherwise decode UTF-8 with the local code page.
+        payload = json.loads(sys.stdin.buffer.read())
         reason = skip_reason(payload, dict(os.environ), config.is_muted())
         if reason:
             log(f"skipped: {reason}")
@@ -43,8 +44,9 @@ def main() -> None:
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True,
             text=True,
+            encoding="utf-8",
+            **system.detached_kwargs(),
         )
         worker.stdin.write(json.dumps(payload))
         worker.stdin.close()

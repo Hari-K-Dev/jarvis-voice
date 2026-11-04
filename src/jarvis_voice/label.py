@@ -65,7 +65,7 @@ def project_name(cwd: str) -> str:
 
 def _load_names() -> dict:
     try:
-        names = json.loads(config.NAMES.read_text())
+        names = json.loads(config.NAMES.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     return names if isinstance(names, dict) else {}
@@ -86,7 +86,7 @@ def set_spoken_name(folder: str, spoken: str) -> None:
 
 def _write_atomic(path: Path, text: str) -> None:
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}-")
-    with os.fdopen(fd, "w") as f:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(text)
     os.replace(tmp, path)
 
@@ -98,7 +98,7 @@ def _task_file(session_id: str) -> Path | None:
 def load_task(session_id: str) -> str:
     path = _task_file(session_id)
     try:
-        return path.read_text().strip() if path else ""
+        return path.read_text(encoding="utf-8").strip() if path else ""
     except OSError:
         return ""
 
@@ -120,6 +120,6 @@ def save_task(session_id: str, task: str, now: float | None = None) -> None:
 
 
 def announcement(project: str, task: str) -> str:
-    """For example: "Psynapse, delivery policy fix." """
+    """For example: "Acme, delivery policy fix." """
     text = ", ".join(part for part in (project, task) if part)
     return f"{text}." if text else ""

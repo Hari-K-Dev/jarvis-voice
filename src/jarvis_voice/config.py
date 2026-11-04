@@ -3,7 +3,9 @@
 import os
 from pathlib import Path
 
-HOME = Path(os.environ.get("JARVIS_HOME", "~/.local/share/jarvis-voice")).expanduser()
+from . import system
+
+HOME = Path(os.environ.get("JARVIS_HOME") or system.default_home()).expanduser()
 MODELS = HOME / "models"
 MUTED = HOME / "muted"
 LOCK = HOME / "speech.lock"
@@ -27,7 +29,7 @@ MODEL_FILES = {
 def ensure_home() -> None:
     """State can reveal project names and timings, so only the owner may read it."""
     HOME.mkdir(parents=True, exist_ok=True, mode=0o700)
-    HOME.chmod(0o700)
+    system.restrict(HOME, 0o700)
 
 
 def model_path(name: str) -> Path:

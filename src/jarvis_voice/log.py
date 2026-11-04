@@ -7,7 +7,7 @@ subprocess.TimeoutExpired does with its command line.
 import os
 import time
 
-from . import config
+from . import config, system
 
 MAX_BYTES = 1_000_000
 
@@ -18,8 +18,8 @@ def log(line: str) -> None:
         if config.LOG.exists() and config.LOG.stat().st_size > MAX_BYTES:
             config.LOG.unlink()
         fd = os.open(config.LOG, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-        os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "a") as f:
+        system.restrict(config.LOG, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {line}\n")
     except OSError:
         pass

@@ -68,9 +68,25 @@ def test_hook_starts_the_worker_outside_the_project(monkeypatch):
         return FakeWorker()
 
     monkeypatch.setattr(hook.subprocess, "Popen", fake_popen)
-    monkeypatch.setattr(hook.sys, "stdin", io.StringIO(json.dumps(MSG)))
+    monkeypatch.setattr(hook.sys, "stdin", io.TextIOWrapper(io.BytesIO(json.dumps(MSG).encode())))
     monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
     monkeypatch.delenv("JARVIS_SUMMARY", raising=False)
     with pytest.raises(SystemExit):
         hook.main()
     assert "-I" in seen["cmd"] and seen["cwd"] == config.HOME
+
+
+def test_hook_decodes_stdin_as_utf8_on_any_platform(monkeypatch):
+    """Regression: text-mode stdin uses the local code page on Windows."""
+    seen = {}
+
+    class FakeWorker:
+        stdin = io.StringIO()
+
+    monkeypatch.setattr(hook.subprocess, "Popen", lambda *a, **k: FakeWorker())
+    monkeypatch.setattr(hook, "skip_reason", lambda p, e, m: seen.update(p) or "stop")
+    raw = json.dumps({"last_assistant_message": "caf\u00e9"}, ensure_ascii=False).encode("utf-8")
+    monkeypatch.setattr(hook.sys, "stdin", io.TextIOWrapper(io.BytesIO(raw), encoding="cp1252"))
+    with pytest.raises(SystemExit):
+        hook.main()
+    assert seen["last_assistant_message"] == "caf\u00e9"

@@ -35,7 +35,7 @@ def run(payload: dict) -> None:
 
 def main() -> None:
     try:
-        run(json.load(sys.stdin))
+        run(json.loads(sys.stdin.buffer.read()))
     except Exception as exc:  # noqa: BLE001 - nothing is watching this process, so log it
         log(f"worker failed: {type(exc).__name__}")
 

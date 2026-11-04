@@ -1,3 +1,4 @@
+import os
 import subprocess
 from types import SimpleNamespace
 
@@ -26,6 +27,11 @@ def test_clean_keeps_and_or_and_fractions():
 
 def test_clean_drops_tables():
     assert "cell" not in brief.clean("Result.\n| a | b |\n| cell | cell |")
+
+
+def test_clean_removes_windows_paths():
+    assert brief.clean(r"Fixed C:\Users\me\app.py today.") == "Fixed today."
+    assert brief.needs_summary(r"See C:\Users\me\app.py")
 
 
 def test_cap_keeps_whole_sentences():
@@ -96,17 +102,22 @@ def test_empty_summary_falls_back():
 
 def test_failure_never_logs_reply_text():
     brief.make_brief("SECRET-CLIENT-TEXT. " * 30, run=boom)
-    assert "SECRET" not in config.LOG.read_text()
+    assert "SECRET" not in config.LOG.read_text(encoding="utf-8")
 
 
-def test_summary_call_is_isolated_from_hooks_and_tools():
+def test_summary_call_is_isolated_from_hooks_and_tools(monkeypatch):
     seen = {}
 
     def spy(cmd, **kwargs):
+        prompt = cmd[cmd.index("--system-prompt-file") + 1]
         seen.update(cmd=cmd, env=kwargs["env"], input=kwargs["input"])
+        seen.update(prompt=open(prompt, encoding="utf-8").read(), prompt_file=prompt)
         return SimpleNamespace(returncode=0, stdout="Done.")
 
+    monkeypatch.setattr(brief.system, "find_claude", lambda: "claude")
     brief.summarise("hello", "my request", "old task", spy)
+    assert seen["prompt"] == brief.SYSTEM_PROMPT
+    assert not os.path.exists(seen["prompt_file"])
     assert seen["env"]["JARVIS_SUMMARY"] == "1"
     for flag in ("--setting-sources", "--strict-mcp-config", "--no-session-persistence"):
         assert flag in seen["cmd"]
@@ -118,3 +129,13 @@ def test_summary_call_is_isolated_from_hooks_and_tools():
 def test_long_input_keeps_start_and_end():
     out = brief.trim_input("A" * 5000 + "B" * 5000)
     assert out.startswith("A") and out.endswith("B") and len(out) < 6100
+
+
+def test_missing_claude_command_falls_back(monkeypatch):
+    raw = "Build failed on step two. " + "More. " * 60
+
+    def missing():
+        raise FileNotFoundError("claude")
+
+    monkeypatch.setattr(brief.system, "find_claude", missing)
+    assert brief.make_brief(raw).text == "Build failed on step two."
