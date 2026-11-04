@@ -1,7 +1,6 @@
 """Synthesis and playback. Only one voice speaks at a time, across all sessions."""
 
 import fcntl
-import json
 import os
 import signal
 import subprocess
@@ -9,12 +8,11 @@ import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
 
 from . import config
 from .log import log
 
-MULTI_SESSION_WINDOW = 1800
+PAUSE_SECONDS = 0.45
 
 
 @contextmanager
@@ -26,43 +24,24 @@ def speech_lock() -> Iterator[None]:
         yield
 
 
-def project_name(cwd: str) -> str:
-    path = Path(cwd)
-    for candidate in (path, *path.parents):
-        if (candidate / ".git").exists():
-            return candidate.name
-    return path.name
-
-
-def with_project_prefix(brief: str, cwd: str, now: float | None = None) -> str:
-    """Name the project only when another project has spoken recently."""
-    now = time.time() if now is None else now
-    project = project_name(cwd) if cwd else ""
-    try:
-        recent = json.loads(config.RECENT.read_text())
-    except (OSError, ValueError):
-        recent = {}
-    recent = {k: v for k, v in recent.items() if now - v < MULTI_SESSION_WINDOW}
-    others = [name for name in recent if name != project]
-    if project:
-        recent[project] = now
-    try:
-        config.RECENT.write_text(json.dumps(recent))
-    except OSError as exc:
-        log(f"could not save recent projects: {type(exc).__name__}")
-    return f"{project}: {brief}" if project and others else brief
-
-
-def synthesise(text: str, path: str) -> None:
+def synthesise(parts: list[str], path: str) -> None:
     # Imported here so the hook and CLI stay quick.
+    import numpy
     import soundfile
     from kokoro_onnx import Kokoro
 
     engine = Kokoro(
         str(config.model_path("kokoro-v1.0.onnx")), str(config.model_path("voices-v1.0.bin"))
     )
-    samples, rate = engine.create(text, voice=config.VOICE, speed=config.SPEED, lang=config.LANG)
-    soundfile.write(path, samples, rate)
+    audio, rate = [], 24000
+    for part in parts:
+        samples, rate = engine.create(
+            part, voice=config.VOICE, speed=config.SPEED, lang=config.LANG
+        )
+        if audio:
+            audio.append(numpy.zeros(int(rate * PAUSE_SECONDS), dtype=samples.dtype))
+        audio.append(samples)
+    soundfile.write(path, numpy.concatenate(audio), rate)
 
 
 def play(path: str) -> None:
@@ -85,18 +64,21 @@ def stop_playback() -> bool:
         return False
 
 
-def speak(text: str) -> None:
-    """Speak with Kokoro, falling back to the macOS voice so a brief is never lost."""
+def speak(*parts: str) -> None:
+    """Speak with a short pause between parts. Falls back to the macOS voice if Kokoro fails."""
+    parts = [part for part in parts if part]
+    if not parts:
+        return
     with tempfile.TemporaryDirectory() as tmp:
         wav = os.path.join(tmp, "brief.wav")
         try:
             started = time.time()
-            synthesise(text, wav)
-            log(f"synthesised {len(text)} chars in {time.time() - started:.2f}s")
+            synthesise(parts, wav)
+            log(f"synthesised {sum(map(len, parts))} chars in {time.time() - started:.2f}s")
         except Exception as exc:  # noqa: BLE001 - any engine failure must still produce speech
             log(f"kokoro failed, using say: {type(exc).__name__}")
             try:
-                subprocess.run(["say", "-v", "Daniel", text], check=False, timeout=60)
+                subprocess.run(["say", "-v", "Daniel", " ".join(parts)], check=False, timeout=60)
             except (OSError, subprocess.SubprocessError) as say_exc:
                 log(f"say failed: {type(say_exc).__name__}")
             return

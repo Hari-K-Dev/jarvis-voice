@@ -1,4 +1,4 @@
-"""The jarvis command: mute, unmute, status, say, test, install, uninstall."""
+"""The jarvis command: mute, unmute, name, status, say, test, install, uninstall."""
 
 import hashlib
 import json
@@ -11,7 +11,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from . import config
+from . import config, label
 from .brief import make_brief
 from .speech import speak, speech_lock, stop_playback
 
@@ -141,16 +141,23 @@ def main() -> None:
         with speech_lock():
             speak(" ".join(args[1:]))
     elif command == "test":
-        brief = make_brief(SAMPLE)
-        print(f"Spoken: {brief}")
+        brief = make_brief(SAMPLE, "Please fix the login bug")
+        heading = label.announcement(label.spoken_project(os.getcwd()), brief.task)
+        print(f"Spoken: {heading} ... {brief.text}")
         with speech_lock():
-            speak(brief)
+            speak(heading, brief.text)
+    elif command == "name" and len(args) > 1:
+        folder = label.project_name(os.getcwd())
+        label.set_spoken_name(folder, " ".join(args[1:]))
+        print(f"{folder} will be announced as: {' '.join(args[1:])}")
     elif command == "install":
         install()
     elif command == "uninstall":
         uninstall()
     else:
-        raise SystemExit("usage: jarvis [status|mute|unmute|say TEXT|test|install|uninstall]")
+        raise SystemExit(
+            "usage: jarvis [status|mute|unmute|name SPOKEN|say TEXT|test|install|uninstall]"
+        )
 
 
 if __name__ == "__main__":

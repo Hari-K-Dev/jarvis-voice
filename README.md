@@ -3,7 +3,9 @@
 Spoken briefs for Claude Code. The full reply stays on screen, and you hear what a colleague would say across the desk.
 
 > **On screen:** 400 words, a diff and test output
-> **Spoken:** "Login bug's fixed and the tests pass. I haven't pushed it. Want me to?"
+> **Spoken:** "Psynapse, delivery policy fix. *(pause)* It's fixed and the tests pass. Want me to push it?"
+
+Every brief starts with the project and the task, so you can tell which session is talking.
 
 Runs on macOS. The voice (Kokoro, `bm_fable`) is local, so reply text only goes to Anthropic, through your own Claude Code sign-in.
 
@@ -25,6 +27,7 @@ jarvis test
 |---|---|
 | `jarvis status` | Shows voice, mute state, hook and models |
 | `jarvis mute` / `jarvis unmute` | Silences speech, including anything playing now |
+| `jarvis name "Psynapse"` | Sets how the current repo is announced. Otherwise it uses the folder name. |
 | `jarvis say "text"` | Speaks text as written |
 | `jarvis test` | Runs a sample reply through the whole chain |
 | `jarvis uninstall` | Removes the hook and the command |
@@ -36,12 +39,12 @@ Change the voice with `JARVIS_VOICE` and the pace with `JARVIS_SPEED`.
 ## How it works
 
 1. The Stop hook starts a background worker and returns at once, so a session is never held up. Headless `claude -p` runs stay silent.
-2. Short plain replies are spoken as written. Anything else goes to Haiku, with no tools, settings or MCP servers loaded.
-3. If the summary fails, it speaks the reply's first sentence plus any closing question.
-4. A lock means only one session speaks at a time. Once two projects are active, each brief starts with its project name.
+2. Haiku names the task from your latest request and writes the brief, with no tools, settings or MCP servers loaded. Short plain replies are spoken as written and reuse the session's latest task name.
+3. If the summary fails, it speaks the reply's first sentence plus any closing question, under the session's latest task name.
+4. A lock means only one session speaks at a time.
 5. If Kokoro fails, the macOS voice reads the brief instead.
 
-The log at `~/.local/share/jarvis-voice/jarvis.log` holds timings and errors only, never reply text.
+The log at `~/.local/share/jarvis-voice/jarvis.log` holds timings and errors only, never reply text. Task names are kept in `tasks/` in the same private folder for 7 days.
 
 ## Develop
 

@@ -97,6 +97,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "kokoro-onnx" },
+    { name = "numpy" },
     { name = "soundfile" },
 ]
 
@@ -109,6 +110,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "kokoro-onnx", specifier = ">=0.4" },
+    { name = "numpy", specifier = ">=2.5.4" },
     { name = "soundfile", specifier = ">=0.12" },
 ]
 

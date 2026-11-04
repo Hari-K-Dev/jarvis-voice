@@ -8,7 +8,8 @@ MODELS = HOME / "models"
 MUTED = HOME / "muted"
 LOCK = HOME / "speech.lock"
 PLAYER_PID = HOME / "player.pid"
-RECENT = HOME / "recent.json"
+TASKS = HOME / "tasks"
+NAMES = HOME / "names.json"
 LOG = HOME / "jarvis.log"
 
 VOICE = os.environ.get("JARVIS_VOICE", "bm_fable")

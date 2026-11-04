@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Spoken briefs for Claude Code: hear the outcome, read the detail."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = ["kokoro-onnx>=0.4", "soundfile>=0.12"]
+dependencies = [
+    "kokoro-onnx>=0.4",
+    "numpy>=2.5.4",
+    "soundfile>=0.12",
+]
 
 [project.scripts]
 jarvis = "jarvis_voice.cli:main"

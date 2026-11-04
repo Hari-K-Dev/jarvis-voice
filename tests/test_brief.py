@@ -37,15 +37,39 @@ def test_cap_handles_one_long_sentence():
     assert len(out) <= 51 and out.endswith(".")
 
 
-def test_short_plain_reply_skips_the_model():
+def test_short_reply_with_a_known_task_skips_the_model():
     def fail(*a, **k):
         raise AssertionError("model should not be called")
 
-    assert brief.make_brief("Tests pass. Want me to push?", fail) == "Tests pass. Want me to push?"
+    out = brief.make_brief("Tests pass.", "fix it", "login fix", fail)
+    assert out == brief.Brief("login fix", "Tests pass.")
 
 
-def test_long_reply_uses_the_model_and_its_output_is_cleaned():
-    assert brief.make_brief("x " * 200, ok("**Done** \u2014 all good.")) == "Done, all good."
+def test_short_reply_with_no_task_yet_still_gets_one():
+    out = brief.make_brief("Tests pass.", "fix it", "", ok("TASK: login fix\nBRIEF: Tests pass."))
+    assert out.task == "login fix"
+
+
+def test_long_reply_returns_a_cleaned_task_and_brief():
+    out = brief.make_brief(
+        "x " * 200, run=ok("TASK: **login** fix.\nBRIEF: **Done** \u2014 all good.")
+    )
+    assert out == brief.Brief("login fix", "Done, all good.")
+
+
+def test_multiline_brief_is_kept():
+    out = brief.parse_summary("TASK: a fix\nBRIEF: One.\nTwo?", "")
+    assert out.text == "One. Two?"
+
+
+def test_unformatted_output_is_spoken_under_the_existing_task():
+    assert brief.parse_summary("It's done.", "login fix") == brief.Brief("login fix", "It's done.")
+
+
+def test_task_with_no_brief_uses_the_fallback_instead_of_reading_the_label():
+    raw = "Build failed on step two. " + "More. " * 60
+    out = brief.make_brief(raw, "fix", "", ok("TASK: build fix"))
+    assert out.text == "Build failed on step two."
 
 
 def test_code_forces_a_summary_even_when_short():
@@ -55,22 +79,23 @@ def test_code_forces_a_summary_even_when_short():
 
 def test_summary_failure_falls_back_and_keeps_the_question():
     raw = "Login is fixed. " + "Detail here. " * 40 + "Should I push it?"
-    assert brief.make_brief(raw, boom) == "Login is fixed. Should I push it?"
+    assert brief.make_brief(raw, run=boom).text == "Login is fixed. Should I push it?"
 
 
 def test_nonzero_exit_falls_back():
     raw = "Build failed on step two. " + "More. " * 60
-    out = brief.make_brief(raw, lambda *a, **k: SimpleNamespace(returncode=1, stdout=""))
-    assert out == "Build failed on step two."
+    failed = lambda *a, **k: SimpleNamespace(returncode=1, stdout="")  # noqa: E731
+    out = brief.make_brief(raw, "fix", "build fix", failed)
+    assert out == brief.Brief("build fix", "Build failed on step two.")
 
 
 def test_empty_summary_falls_back():
     raw = "Build failed on step two. " + "More. " * 60
-    assert brief.make_brief(raw, ok("  ")) == "Build failed on step two."
+    assert brief.make_brief(raw, run=ok("  ")).text == "Build failed on step two."
 
 
 def test_failure_never_logs_reply_text():
-    brief.make_brief("SECRET-CLIENT-TEXT. " * 30, boom)
+    brief.make_brief("SECRET-CLIENT-TEXT. " * 30, run=boom)
     assert "SECRET" not in config.LOG.read_text()
 
 
@@ -81,12 +106,13 @@ def test_summary_call_is_isolated_from_hooks_and_tools():
         seen.update(cmd=cmd, env=kwargs["env"], input=kwargs["input"])
         return SimpleNamespace(returncode=0, stdout="Done.")
 
-    brief.summarise("hello", spy)
+    brief.summarise("hello", "my request", "old task", spy)
     assert seen["env"]["JARVIS_SUMMARY"] == "1"
     for flag in ("--setting-sources", "--strict-mcp-config", "--no-session-persistence"):
         assert flag in seen["cmd"]
     assert seen["cmd"][seen["cmd"].index("--tools") + 1] == ""
-    assert "<reply>" in seen["input"]
+    for part in ("<reply>", "my request", "old task"):
+        assert part in seen["input"]
 
 
 def test_long_input_keeps_start_and_end():
