@@ -1,0 +1,51 @@
+"""Claude Code Stop hook. Hands off and returns at once: it must never block or fail a session."""
+
+import json
+import os
+import subprocess
+import sys
+
+from . import config
+from .log import log
+
+
+def skip_reason(payload: dict, env: dict, muted: bool) -> str | None:
+    if env.get("JARVIS_SUMMARY"):
+        return "summary session"
+    # Headless runs (sdk-cli) are other tools' background work, not someone at the desk.
+    if env.get("CLAUDE_CODE_ENTRYPOINT") != "cli":
+        return f"entrypoint {env.get('CLAUDE_CODE_ENTRYPOINT')}"
+    if payload.get("stop_hook_active"):
+        return "stop hook continuation"
+    if muted:
+        return "muted"
+    if not (payload.get("last_assistant_message") or "").strip():
+        return "no message"
+    return None
+
+
+def main() -> None:
+    try:
+        payload = json.load(sys.stdin)
+        reason = skip_reason(payload, dict(os.environ), config.is_muted())
+        if reason:
+            log(f"skipped: {reason}")
+            return
+        worker = subprocess.Popen(
+            [sys.executable, "-m", "jarvis_voice.worker"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            text=True,
+        )
+        worker.stdin.write(json.dumps(payload))
+        worker.stdin.close()
+    except Exception as exc:  # noqa: BLE001 - a voice problem must never surface in the session
+        log(f"hook failed: {type(exc).__name__}: {exc}")
+    finally:
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
