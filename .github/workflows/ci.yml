@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      JARVIS_HOME: ${{ github.workspace }}/.ci/jarvis
+      CLAUDE_CONFIG_DIR: ${{ github.workspace }}/.ci/claude
+      JARVIS_BIN_DIR: ${{ github.workspace }}/.ci/bin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+      - uses: actions/cache@v4
+        with:
+          path: .ci/jarvis/models
+          key: kokoro-${{ runner.os }}-${{ hashFiles('src/jarvis_voice/config.py') }}
+      - name: Install, run the hook and synthesise a real brief
+        run: uv run python tests/smoke.py
+        timeout-minutes: 10
