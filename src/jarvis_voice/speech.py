@@ -46,14 +46,16 @@ def synthesise(parts: list[str], path: str) -> None:
 
 
 def play(path: str) -> None:
-    command = system.player_command(path)
-    if not command:
-        log("no audio player found, see the README")
-        return
+    config.ensure_home()
     try:
+        command = system.player_command(path)
+        if not command:
+            log("no audio player found, see the README")
+            return
         player = subprocess.Popen(
             command,
             env={**os.environ, "JARVIS_WAV": path},
+            cwd=config.HOME,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=system.no_window_flags(),
@@ -74,15 +76,17 @@ def play(path: str) -> None:
 
 
 def speak_with_system_voice(text: str) -> None:
-    command = system.fallback_voice_command()
-    if not command:
-        log("no system voice found")
-        return
+    config.ensure_home()
     try:
+        command = system.fallback_voice_command()
+        if not command:
+            log("no system voice found")
+            return
         subprocess.run(
             command,
             input=text,
             encoding="utf-8",
+            cwd=config.HOME,
             check=False,
             timeout=60,
             stdout=subprocess.DEVNULL,

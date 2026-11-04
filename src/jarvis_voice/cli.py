@@ -94,7 +94,8 @@ def write_settings(settings: dict, path: Path | None = None) -> None:
 
 
 def fetch_models() -> None:
-    if not shutil.which("curl"):
+    curl = system.which("curl")
+    if not curl:
         raise SystemExit("curl is needed to download the voice model. Please install it first.")
     config.ensure_home()
     config.MODELS.mkdir(parents=True, exist_ok=True)
@@ -107,7 +108,7 @@ def fetch_models() -> None:
         print(f"downloading {name}")
         try:
             subprocess.run(
-                ["curl", "-fL", "--retry", "2", "-o", str(partial), f"{config.MODEL_BASE}/{name}"],
+                [curl, "-fL", "--retry", "2", "-o", str(partial), f"{config.MODEL_BASE}/{name}"],
                 check=True,
             )
         except subprocess.CalledProcessError as exc:
