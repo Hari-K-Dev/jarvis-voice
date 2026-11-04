@@ -2,7 +2,15 @@ import os
 import subprocess
 from types import SimpleNamespace
 
+import pytest
+
 from jarvis_voice import brief, config
+
+
+@pytest.fixture(autouse=True)
+def claude_is_installed(monkeypatch):
+    """CI machines have no claude command, and these tests supply a fake runner anyway."""
+    monkeypatch.setattr(brief.system, "find_claude", lambda: "claude")
 
 
 def ok(text):
@@ -105,7 +113,7 @@ def test_failure_never_logs_reply_text():
     assert "SECRET" not in config.LOG.read_text(encoding="utf-8")
 
 
-def test_summary_call_is_isolated_from_hooks_and_tools(monkeypatch):
+def test_summary_call_is_isolated_from_hooks_and_tools():
     seen = {}
 
     def spy(cmd, **kwargs):
@@ -114,7 +122,6 @@ def test_summary_call_is_isolated_from_hooks_and_tools(monkeypatch):
         seen.update(prompt=open(prompt, encoding="utf-8").read(), prompt_file=prompt)
         return SimpleNamespace(returncode=0, stdout="Done.")
 
-    monkeypatch.setattr(brief.system, "find_claude", lambda: "claude")
     brief.summarise("hello", "my request", "old task", spy)
     assert seen["prompt"] == brief.SYSTEM_PROMPT
     assert not os.path.exists(seen["prompt_file"])
