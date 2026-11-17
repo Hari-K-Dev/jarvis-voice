@@ -1,8 +1,8 @@
 # jarvis-voice
 
-I watched the first *Iron Man* and, like everyone else, I wanted the suit. I made my own cardboard helmet of MK 42 with LEDs and arduino. Totally impressed my classmates!
+I watched the first *Iron Man* and, like everyone nerd ever I wanted the suit. I made my own cardboard helmet of MK 42 with LEDs and arduino. Totally impressed my classmates!
 
-But for the suit, I need to be a billionaire, which will take a few years and a have very forgiving ribcage (working on that in the gym) . What stuck with me was the voice. A guy is working in his garage, and something in the room knows what he's up to. It tells him what matters in one dry sentence, then shuts up and lets him work.
+But for the suit, I need to be a billionaire which will take a few years and have a very forgiving ribcage (working on that in the gym). What stuck with me was the voice. A guy is working in his garage, and something in the room knows what he's up to. It tells him what matters in one dry sentence, then shuts up and lets him work.
 
 I've wanted that ever since. This repo is my attempt, and it runs on a laptop instead of a cave-built reactor.
 
