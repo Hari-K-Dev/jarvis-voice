@@ -22,22 +22,7 @@ JARVIS doesn't read Tony the stack trace. He says the thing a colleague would sa
 
 So that's the rule here. The screen gets the full reply and your ears get the gist.
 
-## How it actually went
 
-**The voice came first.** I tried five British voices from Kokoro, a small open model that runs on your own machine, so my work doesn't get posted off to yet another voice company. A voice called Fable won. It sounded like it had opinions about my code and was too polite to share them.
-
-**Then the first bill arrived, in seconds.** Summarising a reply through the `claude` command took 70 seconds, because it was politely loading every plugin I've ever installed. Stripped right down, it took 3. I'd also confidently predicted about 2 seconds from "Claude finished" to "voice speaks". Reality came in at about 7. JARVIS would have corrected me sooner.
-
-**Then I opened a second session.** I usually have a few running, and very quickly a calm voice told me "It's fixed, want me to push it?" Fixed what? Which one? Push where? It was like getting a phone call that starts halfway through. So every brief now opens with the project and the task, then takes a breath:
-
-> "Acme API, login bug fix. *(pause)* It's fixed and the tests pass. Want me to push it?"
-
-**Then it got funny.** Here's what happened next, all of it true:
-
-- Claude Code's safety check refused to let Claude install its own voice hook. It was a machine, told not to rewire itself, by another machine. I had to run the command by hand, and I respect it.
-- A security review pointed out that a dodgy cloned repo could have sneaked its own code into my hook, and on Windows it could have planted a fake `claude.exe` too. Both are fixed, and tests now guard them.
-- My own test suite uninstalled Jarvis from my laptop. It did exactly what I'd written, which is the worst kind of bug.
-- Another test passed by reading an old log from an earlier run, so it was proudly reporting a success from the past. It now starts with a clean log.
 
 ![Tony Stark waves at a hologram, unbothered](https://media1.tenor.com/m/EHYzxILmfx0AAAAC/tinkering-tony-stark.gif)
 
