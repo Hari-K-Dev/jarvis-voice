@@ -84,6 +84,9 @@ If you try it on Linux or Windows, I'd love to know if it talks to you.
 |---|---|
 | `jarvis status` | Shows voice, mute state, hook, models and audio player |
 | `jarvis mute` / `jarvis unmute` | Silences every session, including anything playing now |
+| `jarvis away on` / `off` | Keeps the speakers off while you're out, separately from mute |
+| `jarvis note OUT.ogg` | Reads a hook payload on stdin, writes a voice note, prints its caption as JSON |
+| `jarvis transcribe AUDIO` | Prints what's said in an audio file, on your machine (`uv sync --extra listen`) |
 | `jarvis name "Acme API"` | Sets how the current repo is announced, otherwise it uses the folder name |
 | `jarvis say "text"` | Speaks your text as written |
 | `jarvis test` | Runs a sample reply through the whole chain |
@@ -106,7 +109,7 @@ So your reply text only goes to Anthropic, through your own Claude Code sign-in.
 - Stop talking the moment I send a new prompt, and say out loud when a session needs my approval.
 - Get that 7 seconds down by keeping the voice model loaded.
 - A real wake word, so I can say "Jarvis" with my hands full.
-- Voice notes over Telegram or WhatsApp for when I'm away from the desk.
+- Voice notes on WhatsApp too. Telegram already works: `note`, `away` and `transcribe` are what my own bot calls when I'm at the gym.
 
 The suit remains out of scope.
 
