@@ -5,13 +5,13 @@ import sys
 import time
 
 from . import config, label
-from .brief import make_brief
+from .brief import Brief, make_brief
 from .log import log
 from .speech import speak, speech_lock
 
 
-def run(payload: dict) -> None:
-    started = time.time()
+def prepare(payload: dict) -> tuple[str, Brief]:
+    """The announcement and brief for one finished turn, for the speakers or a voice note."""
     session_id = payload.get("session_id", "")
     cached_task = label.load_task(session_id)
     brief = make_brief(
@@ -19,17 +19,21 @@ def run(payload: dict) -> None:
         label.last_request(payload.get("transcript_path", "")),
         cached_task,
     )
-    log(f"brief ready in {time.time() - started:.2f}s ({len(brief.text)} chars)")
     if brief.task != cached_task:
         label.save_task(session_id, brief.task)
+    return label.announcement(label.spoken_project(payload.get("cwd", "")), brief.task), brief
+
+
+def run(payload: dict) -> None:
+    started = time.time()
+    heading, brief = prepare(payload)
+    log(f"brief ready in {time.time() - started:.2f}s ({len(brief.text)} chars)")
     with speech_lock():
-        # Checked again here: mute may have been switched on while this was queued.
-        if config.is_muted():
+        # Checked again here: either may have been switched on while this was queued.
+        if config.is_muted() or config.is_away():
             log("muted while queued, dropped")
             return
-        speak(
-            label.announcement(label.spoken_project(payload.get("cwd", "")), brief.task), brief.text
-        )
+        speak(heading, brief.text)
     log(f"finished {time.time() - started:.2f}s after stop")
 
 

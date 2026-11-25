@@ -1,4 +1,4 @@
-"""The jarvis command: mute, unmute, name, status, say, test, install, uninstall."""
+"""The jarvis command: speaker controls, setup, and the voice note tools other programs call."""
 
 import hashlib
 import json
@@ -10,8 +10,9 @@ import tempfile
 import time
 from pathlib import Path
 
-from . import config, label, system
+from . import config, label, note, system
 from .brief import make_brief
+from .log import log
 from .speech import speak, speech_lock, stop_playback
 
 SETTINGS = Path(os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude").expanduser() / "settings.json"
@@ -182,15 +183,50 @@ def status() -> None:
     player = system.player_command("x")
     print(f"voice:  {config.VOICE}")
     print(f"muted:  {'yes' if config.is_muted() else 'no'}")
+    print(f"away:   {'yes' if config.is_away() else 'no'}")
     print(f"hook:   {'installed' if hooked else 'not installed'}")
     print(f"models: {'present' if models else 'missing'}")
     print(f"audio:  {player[0] if player else 'no player found'}")
     print(f"log:    {config.LOG}")
 
 
+def set_away(on: bool) -> None:
+    config.ensure_home()
+    if on:
+        config.AWAY.touch()
+        stop_playback()
+    else:
+        config.AWAY.unlink(missing_ok=True)
+    print(f"Away {'on: the speakers stay off' if on else 'off: the speakers are back'}.")
+
+
+def run_note(out: str) -> None:
+    """Prints JSON for the program that called it. Exit code 1 means no voice note was made."""
+    try:
+        result = note.render(json.loads(sys.stdin.buffer.read()), out)
+    except Exception as exc:  # noqa: BLE001 - the caller falls back to text, the log keeps the cause
+        log(f"voice note failed: {type(exc).__name__}")
+        raise SystemExit(1) from None
+    print(json.dumps(result, ensure_ascii=False))
+
+
+def run_transcribe(path: str) -> None:
+    from .transcribe import transcribe
+
+    try:
+        text = transcribe(path)
+    except Exception as exc:  # noqa: BLE001 - never log the words, only what kind of failure it was
+        log(f"transcription failed: {type(exc).__name__}")
+        raise SystemExit(1) from None
+    if not text:
+        log("transcription was empty")
+        raise SystemExit(1)
+    print(text)
+
+
 def main() -> None:
     # A Windows console's code page cannot show every character a brief might hold.
-    sys.stdout.reconfigure(errors="replace")
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     args = sys.argv[1:]
     command = args[0] if args else "status"
     if command == "mute":
@@ -203,6 +239,12 @@ def main() -> None:
         print("Unmuted.")
     elif command == "status":
         status()
+    elif command == "away" and args[1:] in (["on"], ["off"]):
+        set_away(args[1] == "on")
+    elif command == "note" and len(args) == 2:
+        run_note(args[1])
+    elif command == "transcribe" and len(args) == 2:
+        run_transcribe(args[1])
     elif command == "say" and len(args) > 1:
         with speech_lock():
             speak(" ".join(args[1:]))
@@ -222,7 +264,8 @@ def main() -> None:
         uninstall()
     else:
         raise SystemExit(
-            "usage: jarvis [status|mute|unmute|name SPOKEN|say TEXT|test|install|uninstall]"
+            "usage: jarvis [status|mute|unmute|away on|off|name SPOKEN|say TEXT|test|"
+            "note OUT.ogg|transcribe AUDIO|install|uninstall]"
         )
 
 

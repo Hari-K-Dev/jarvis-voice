@@ -33,7 +33,7 @@ def main() -> None:
     try:
         # Bytes, because Windows would otherwise decode UTF-8 with the local code page.
         payload = json.loads(sys.stdin.buffer.read())
-        reason = skip_reason(payload, dict(os.environ), config.is_muted())
+        reason = skip_reason(payload, dict(os.environ), config.is_muted() or config.is_away())
         if reason:
             log(f"skipped: {reason}")
             return

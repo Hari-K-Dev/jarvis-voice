@@ -8,6 +8,7 @@ from . import system
 HOME = Path(os.environ.get("JARVIS_HOME") or system.default_home()).expanduser()
 MODELS = HOME / "models"
 MUTED = HOME / "muted"
+AWAY = HOME / "away"
 LOCK = HOME / "speech.lock"
 PLAYER_PID = HOME / "player.pid"
 TASKS = HOME / "tasks"
@@ -18,6 +19,7 @@ VOICE = os.environ.get("JARVIS_VOICE", "bm_fable")
 SPEED = float(os.environ.get("JARVIS_SPEED", "1.0"))
 LANG = "en-gb"
 SUMMARY_MODEL = os.environ.get("JARVIS_SUMMARY_MODEL", "haiku")
+WHISPER_MODEL = os.environ.get("JARVIS_WHISPER_MODEL", "small.en")
 
 MODEL_BASE = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 MODEL_FILES = {
@@ -38,3 +40,8 @@ def model_path(name: str) -> Path:
 
 def is_muted() -> bool:
     return MUTED.exists()
+
+
+def is_away() -> bool:
+    """Nobody is at the desk, so the speakers stay off. Voice notes still go out."""
+    return AWAY.exists()
