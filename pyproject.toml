@@ -13,6 +13,9 @@ dependencies = [
     "soundfile>=0.12",
 ]
 
+[project.optional-dependencies]
+listen = ["faster-whisper>=1.1", "av<17"]
+
 [project.scripts]
 jarvis = "jarvis_voice.cli:main"
 jarvis-hook = "jarvis_voice.hook:main"

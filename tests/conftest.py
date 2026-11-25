@@ -8,6 +8,8 @@ def isolated_home(tmp_path, monkeypatch):
     """Tests never touch real state."""
     monkeypatch.setattr(config, "HOME", tmp_path)
     monkeypatch.setattr(config, "MUTED", tmp_path / "muted")
+    monkeypatch.setattr(config, "AWAY", tmp_path / "away")
+    monkeypatch.setattr(config, "MODELS", tmp_path / "models")
     monkeypatch.setattr(config, "LOCK", tmp_path / "speech.lock")
     monkeypatch.setattr(config, "PLAYER_PID", tmp_path / "player.pid")
     monkeypatch.setattr(config, "TASKS", tmp_path / "tasks")
