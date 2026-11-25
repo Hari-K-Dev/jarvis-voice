@@ -6,7 +6,6 @@ import subprocess
 import tempfile
 
 from . import config, system
-from .brief import clean
 from .speech import speech_lock, synthesise
 from .worker import prepare
 
@@ -46,6 +45,13 @@ def encode_voice_note(wav: str, out: str) -> None:
     )
 
 
+def says_everything(raw: str, spoken: str) -> bool:
+    """Compared with the reply as written. Cleaning drops code, tables and links, so comparing
+    cleaned text would call a reply complete after losing exactly the parts worth reading."""
+    written = " ".join(raw.split())
+    return written in (spoken, spoken.removesuffix("."))
+
+
 def render(payload: dict, out: str) -> dict:
     """Writes the note to `out`. There is no system voice fallback: the caller falls back to text.
 
@@ -67,5 +73,5 @@ def render(payload: dict, out: str) -> dict:
     return {
         "caption": "\n".join(parts),
         "duration": duration,
-        "complete": clean(payload["last_assistant_message"]) == brief.text,
+        "complete": says_everything(payload["last_assistant_message"], brief.text),
     }
