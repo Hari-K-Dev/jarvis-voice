@@ -15,6 +15,7 @@ MAX_REQUEST = 1500
 TASK_MAX_AGE = 7 * 24 * 3600
 _SAFE_ID = re.compile(r"^[\w-]{1,128}$")
 _TAG_BLOCK = re.compile(r"<([a-z][\w-]*)\b[^>]*>.*?</\1>", re.DOTALL)
+_CHANNEL = re.compile(r"<channel\b[^>]*>(.*?)</channel>", re.DOTALL)
 
 
 def last_request(transcript_path: str) -> str:
@@ -52,7 +53,8 @@ def _request_text(line: str) -> str:
         )
     if not isinstance(content, str):
         return ""
-    return _TAG_BLOCK.sub("", content).strip()
+    # Messages sent from a phone arrive wrapped in a channel tag, and they are real requests.
+    return _TAG_BLOCK.sub("", _CHANNEL.sub(r"\1", content)).strip()
 
 
 def project_name(cwd: str) -> str:
