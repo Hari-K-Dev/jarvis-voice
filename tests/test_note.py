@@ -1,3 +1,4 @@
+import hashlib
 import json
 import shutil
 import sys
@@ -37,6 +38,21 @@ def test_render_reports_caption_and_rounded_up_duration(stubbed, tmp_path):
 
 def test_render_says_when_the_brief_is_the_whole_reply(stubbed, tmp_path):
     result = note.render({"last_assistant_message": "It's fixed."}, str(tmp_path / "n.ogg"))
+    assert result["complete"] is True
+
+
+@pytest.mark.parametrize(
+    "extra",
+    ["\n```\nrm -rf build\n```", "\n| a | b |", " See [it](https://x.test).", " /etc/hosts"],
+)
+def test_a_reply_with_parts_not_spoken_is_never_complete(stubbed, tmp_path, extra):
+    """Regression: code and tables were stripped before comparing, so the full text never went."""
+    payload = {"last_assistant_message": "It's fixed." + extra}
+    assert note.render(payload, str(tmp_path / "n.ogg"))["complete"] is False
+
+
+def test_a_missing_full_stop_still_counts_as_complete(stubbed, tmp_path):
+    result = note.render({"last_assistant_message": "It's fixed\n"}, str(tmp_path / "n.ogg"))
     assert result["complete"] is True
 
 
@@ -118,39 +134,75 @@ def test_request_sent_from_a_phone_names_the_task(tmp_path):
     assert label.last_request(str(transcript)) == "push it"
 
 
-def test_transcribe_joins_segments_and_filters_silence(monkeypatch):
-    seen = {}
+def _fake_whisper(monkeypatch, tmp_path, contents=b"weights", cached=True):
+    """A pretend model of one file, pinned to the hash of b"weights"."""
+    seen = {"downloads": []}
+    folder = tmp_path / "snapshot"
+    folder.mkdir()
+    (folder / "model.bin").write_bytes(contents)
+    pin = hashlib.sha256(b"weights").hexdigest()
+    monkeypatch.setattr(config, "WHISPER_PINS", {"small.en": ("abc123", {"model.bin": pin})})
+
+    def download_model(name, local_files_only=False, **options):
+        seen["downloads"].append(local_files_only)
+        seen["revision"] = options["revision"]
+        if local_files_only and not cached:
+            raise OSError("not downloaded")
+        return str(folder)
 
     class Model:
-        def __init__(self, name, **options):
-            seen.update(options, name=name)
+        def __init__(self, path, **options):
+            seen.update(options, path=path)
 
         def transcribe(self, path, **options):
             seen.update(options)
             segment = types.SimpleNamespace
             return [segment(text=" yes, "), segment(text=" push it ")], None
 
-    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=Model))
+    module = types.SimpleNamespace(WhisperModel=Model, download_model=download_model)
+    monkeypatch.setitem(sys.modules, "faster_whisper", module)
+    return seen
+
+
+def test_transcribe_joins_segments_and_filters_silence(monkeypatch, tmp_path):
+    seen = _fake_whisper(monkeypatch, tmp_path)
     assert transcribe.transcribe("a.ogg") == "yes, push it"
-    assert seen["local_files_only"] is True and seen["vad_filter"] is True
+    assert seen["downloads"] == [True] and seen["vad_filter"] is True
     assert seen["language"] == "en"
 
 
-def test_transcribe_downloads_the_model_only_when_it_is_missing(monkeypatch):
-    attempts = []
+def test_transcribe_downloads_the_pinned_model_only_when_it_is_missing(monkeypatch, tmp_path):
+    seen = _fake_whisper(monkeypatch, tmp_path, cached=False)
+    assert transcribe.transcribe("a.ogg") == "yes, push it"
+    assert seen["downloads"] == [True, False] and seen["revision"] == "abc123"
 
-    class Model:
-        def __init__(self, name, **options):
-            attempts.append(options.get("local_files_only", False))
-            if options.get("local_files_only"):
-                raise OSError("not downloaded")
 
-        def transcribe(self, path, **options):
-            return [], None
+@pytest.mark.parametrize("cached", [True, False])
+def test_a_tampered_speech_model_is_never_loaded(monkeypatch, tmp_path, cached):
+    seen = _fake_whisper(monkeypatch, tmp_path, contents=b"tampered", cached=cached)
+    with pytest.raises(RuntimeError):
+        transcribe.transcribe("a.ogg")
+    assert "path" not in seen
 
-    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=Model))
-    assert transcribe.transcribe("a.ogg") == ""
-    assert attempts == [True, False]
+
+def test_a_folder_named_like_the_model_is_not_loaded_from_the_cwd(monkeypatch, tmp_path):
+    seen = _fake_whisper(monkeypatch, tmp_path)
+    (tmp_path / "small.en").mkdir()
+    monkeypatch.chdir(tmp_path)
+    transcribe.transcribe("a.ogg")
+    assert seen["path"] == str(tmp_path / "snapshot")
+
+
+def test_an_unpinned_model_must_be_an_absolute_path(monkeypatch, tmp_path):
+    seen = _fake_whisper(monkeypatch, tmp_path)
+    for name in ("small", "./model", "someone/else"):
+        monkeypatch.setattr(config, "WHISPER_MODEL", name)
+        with pytest.raises(ValueError):
+            transcribe.transcribe("a.ogg")
+    assert seen["downloads"] == []
+    monkeypatch.setattr(config, "WHISPER_MODEL", str(tmp_path))
+    transcribe.transcribe("a.ogg")
+    assert seen["path"] == str(tmp_path)
 
 
 def test_empty_transcription_is_a_failure(monkeypatch):
